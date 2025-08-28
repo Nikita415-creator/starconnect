@@ -1,22 +1,21 @@
-# relay_ws.py (исправленный)
-import asyncio
-import websockets
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import uvicorn
 
+app = FastAPI()
 clients = set()
 
-async def handler(ws, path):
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await ws.accept()
     clients.add(ws)
     try:
-        async for message in ws:
+        while True:
+            data = await ws.receive_bytes()
             for c in clients:
                 if c != ws:
-                    await c.send(message)
-    finally:
+                    await c.send_bytes(data)
+    except WebSocketDisconnect:
         clients.remove(ws)
 
-async def main():
-    async with websockets.serve(handler, "0.0.0.0", 443):
-        print("Relay запущен на порту 443…")
-        await asyncio.Future()  # чтобы сервер не завершался
-
-asyncio.run(main())
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
